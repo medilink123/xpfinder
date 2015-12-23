@@ -1,0 +1,141 @@
+package com.medilink.xpmedilinklocator;
+
+import android.content.ContentResolver;
+import android.content.ContentValues;
+import android.database.Cursor;
+import android.os.Bundle;
+import android.support.v4.app.FragmentActivity;
+import android.view.View;
+import android.widget.AdapterView;
+import android.widget.AdapterView.OnItemClickListener;
+import android.widget.ArrayAdapter;
+import android.widget.ListView;
+
+public class AdvancedSettingsFragmentActivity extends FragmentActivity
+{
+    //Web Service URL Details
+    private String[] fromWebservice = { DbConstants.saveURL, DbConstants.saveURLNamespace, DbConstants.saveURLDate};
+    private String strNamespace, strUrl;
+
+    //Controls
+    private ListView lv1;
+
+    private ContentResolver cr;
+    /** Called when the activity is first created. */
+    @Override
+    public void onCreate(Bundle savedInstanceState)
+    {
+        // TODO onCreate method stub
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.advancedsettings);
+
+        //Retrieve WebService Properties
+        cr = this.getApplication().getContentResolver(); //For ListView Click Update Query
+        passWebServiceValues();
+
+        lv1 = (ListView)findViewById(android.R.id.list);
+        lv1.setTextFilterEnabled(true);
+
+        //Items to be loaded to ListView depending on Auto Update set to ON or OFF
+        String[] itemsAutoUpdateOn = { 	getResources().getString(R.string.advanced_getupdates),
+                getResources().getString(R.string.advanced_autoupdateon),
+                getResources().getString(R.string.advanced_updatesettings),
+                getResources().getString(R.string.advanced_back)
+        };
+
+        String[] itemsAutoUpdateOff = { getResources().getString(R.string.advanced_getupdates),
+                getResources().getString(R.string.advanced_autoupdateoff),
+                getResources().getString(R.string.advanced_updatesettings),
+                getResources().getString(R.string.advanced_back)
+        };
+
+        // R.layout.menu_item > see menu item used in ListView items in xml.xml
+        final ArrayAdapter<String> adaptUpdateOn = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, itemsAutoUpdateOn); // items);
+        final ArrayAdapter<String> adaptUpdateOff = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, itemsAutoUpdateOff); // items);
+        lv1.setAdapter((WebService.IS_ENABLED_AUTO_UPDATE ? adaptUpdateOn : adaptUpdateOff));
+
+        //get ListView and set onClick() listener,
+        //so we can catch on which element user clicked and
+        //set itemId variable on that value.
+        lv1.setOnItemClickListener(new OnItemClickListener()
+        {
+            public void onItemClick(AdapterView<?> a, View v, int position, long id)
+            {
+                switch(position)
+                {
+                    case 0:
+                        BusinessRules.startIntent(AdvancedSettingsFragmentActivity.this, UpdateBranchesFragmentActivity.class, null);
+                        break;
+                    case 1:
+                        //Update EnableAutoUpdate in tblSettings
+                        ContentValues values = new ContentValues();
+                        values = new ContentValues();
+                        values.put(DbConstants.EnableAutoUpdate, (WebService.IS_ENABLED_AUTO_UPDATE ? 0 : 1) ); //(Alternate) if isEnabledAutoUpdate is On, then we turn it Off. Otherwise, we turn it On.
+                        cr.update(	DbContentProvider.SETTINGS_CONTENT_URI, values, null, null);
+                        WebService.IS_ENABLED_AUTO_UPDATE = (WebService.IS_ENABLED_AUTO_UPDATE ? false : true); //update latest chkEnableAutoUpdate value (in case the User suddenly decides to update again)
+                        lv1.setAdapter((WebService.IS_ENABLED_AUTO_UPDATE ? adaptUpdateOn : adaptUpdateOff)); //update Advance Settings Menu Items (ListView)
+                        break;
+                    case 2:
+                        //assign values to pass
+                        Bundle url = new Bundle();
+                        passWebServiceValues();
+
+                        url.putString("url", strUrl);
+                        url.putString("urlnamespace", strNamespace);
+                        //StartIntent(AdvancedSettingsFragmentActivity.this, WebServiceSetupFragmentActivity.class, url);
+                        BusinessRules.startIntent(AdvancedSettingsFragmentActivity.this, UpdateURLFragmentActivity.class, url);
+                        break;
+                    case 3:
+                        finish(); //end activity
+                        break;
+                }
+            }
+        });
+    }
+
+    /** Called when the activity has become visible (it is now "resumed"). */
+    @Override
+    protected void onResume() {
+        super.onResume();
+        //Called when the activity will start interacting with the user.
+        //At this point your activity is at the top of the activity stack, with user input going to it.
+        //Always followed by onPause().
+
+        //Items to be loaded to ListView depending on Auto Update set to ON or OFF
+        String[] itemsAutoUpdateOn = { 	getResources().getString(R.string.advanced_getupdates),
+                getResources().getString(R.string.advanced_autoupdateon),
+                getResources().getString(R.string.advanced_updatesettings),
+                getResources().getString(R.string.advanced_back)
+        };
+
+        String[] itemsAutoUpdateOff = { getResources().getString(R.string.advanced_getupdates),
+                getResources().getString(R.string.advanced_autoupdateoff),
+                getResources().getString(R.string.advanced_updatesettings),
+                getResources().getString(R.string.advanced_back)
+        };
+
+        // R.layout.menu_item > see menu item used in ListView items in xml.xml
+        final ArrayAdapter<String> adaptUpdateOn = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, itemsAutoUpdateOn); // items);
+        final ArrayAdapter<String> adaptUpdateOff = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, itemsAutoUpdateOff); // items);
+        lv1.setAdapter((WebService.IS_ENABLED_AUTO_UPDATE ? adaptUpdateOn : adaptUpdateOff));
+    }
+
+    /* DB Queries Methods **/
+    /**
+     * This method gets WebService URL From DB using Loaders and
+     * passes URL and Namespace to WebService Class
+     */
+    private void passWebServiceValues()
+    {
+        Cursor curWebService = this.getApplication().getContentResolver().query(
+                DbContentProvider.WEBSERVICE_URL_CONTENT_URI, fromWebservice, null, null, null);
+        if (curWebService.moveToFirst())
+        {
+            strUrl = curWebService.getString(curWebService.getColumnIndex(DbConstants.saveURL));
+            strNamespace = curWebService.getString(curWebService.getColumnIndex(DbConstants.saveURLNamespace));
+        }
+        curWebService.close(); //clean up
+        WebService.URL = strUrl;
+        WebService.NAMESPACE = strNamespace;
+    }
+}
